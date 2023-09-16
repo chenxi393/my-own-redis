@@ -85,7 +85,7 @@ poll vs select vs epoll（具体看下面的文章）
 ### 06.The Event Loop Implementation
 * server端的代码改变很多
 * client变化不大 就是一次只发一条 变成了连发三条 pipeline
-* TODO 记得完成作业 调研epoll  先完成作业再看下一章！！！
+* 9.16 3个exercises已经完成 自己拿已有的客户端 验证了一下
 
 ### IO多路复用 select poll epoll
 1. 使用场景：设计一个高性能的网络服务器（一个服务器要处理多个客户端的请求）
@@ -93,7 +93,8 @@ poll vs select vs epoll（具体看下面的文章）
 3. 考虑使用单线程 能够保证单线程处理a请求的消息 b的消息不丢失的原因是`dma技术` 这样单线程处理多个请求成为可行的 ❓这里可以再去了解一下dma
 4. ulimit -n 单个进程能够监视的文件描述符的数量存在最大限制 1024
 5. [下面三种具体代码看这](https://devarea.com/linux-io-multiplexing-select-vs-poll-vs-epoll/#.XYD0TygzaUl)
-6. [参考文章](https://segmentfault.com/a/1190000003063859)
+6. [参考文章 中文的](https://segmentfault.com/a/1190000003063859)
+7. [可参考的文章 讲解三种的优缺点 什么时候用](https://www.ulduzsoft.com/2014/01/select-poll-epoll-practical-difference-for-system-architects/)
 #### SELECT
 ```python
 # 一般情况的伪码描述 好像就是select 轮询的模式
