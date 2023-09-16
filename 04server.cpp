@@ -168,8 +168,7 @@ int main() {
         while (true) {
             // here the server only serves one client connection at once
             // ⭐一次只能处理一个客户端的请求
-            // 05节则说如何更改并发了 
-            // 三种
+            // 05节则说如何更改为并发
             int32_t err = one_request(connfd);
             if (err) {
                 break;
