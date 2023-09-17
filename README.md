@@ -165,3 +165,66 @@ struct pollfd {
 
 #### 可以有个待办 
 去测试三种并发的连接数 或者类似于QPS的东西 可以网上找找有没有类似的
+
+
+### 07 08 09  9.17
+* 07主要是get set del 操作的实现 自定义了协议 难度不大
+* 目前为止难度最大的就是06 event loop那里 事件循环的三种方式
+* 据了解go net listen就是（socket bind listen accept）的集合 且linux内置epoll 可以考虑用go写一个redis 然后
+
+#### 08 提问
+* 为什么哈希表要用2的幂 而不用素数 ？？
+* 对于 2 的幂，MOD 和按位 AND 输出相同的结果，并且考虑到按位 AND 比 MOD 快一个数量级  (i % 2^k) == (i & (2^k) - 1) 那为什么不用素数减少碰撞
+* 2的幂位运算怎么判断 n & (n -1 ) ==0 因为为2的幂 只有最高位为1
+* 使用位掩码进行索引操作的好处是，它可以在常数时间内完成，不需要进行昂贵的除法或取模运算。这对于大型的哈希表或需要高性能的应用非常重要。
+* 插入 查找 删除 书里指针这一块太太绕了 指针的指针
+> 对于哈希表的大小为8的情况，假设节点的哈希码为18，其二进制表示为 00010010。通过与位掩码 00000111 进行按位与运算，只保留了哈希码的低3位，得到的结果为 00000010，即索引为2。这样，节点就被插入到了哈希表的第2个位置。
+
+* 当负载因子太高 需要扩容哈希表 但是扩容会耗费事件 可能redis不可用 需要保留两个哈希表 逐渐移动节点
+* 08节页太难了吧 很多都看不懂
+* 作业：We typically grow the hash table when the `load factor` hits 0.5 and `shrink` when we hit 0.125. 官方答案是如果继续运行 扩容可能是不必要的 网上有到0.125时缩容
+* 哈希码hcode的生成方式可以稍微注意一下 和一些加密方式md5啥的好像类似模式
+
+#### 侵入式数据结构  这个困扰了一会 但是理解了之后感觉还是很有用的 而且只有没有gc的语言可以实现 (这可以写在简历上)
+```c
+// hashtable node, should be embedded into the payload
+struct HNode {
+    HNode *next = NULL;
+    uint64_t hcode = 0;
+};
+
+// the structure for the key
+struct Entry {
+    struct HNode node;
+    std::string key;
+    std::string val;
+};
+```
+也就是哈希表中不放任何数据,只放一个哈希码用于查找
+但是next指针是和entry一起分配内存的,它们是连续的
+可以靠next的地址拿到Entry的地址
+>在C/C++中，new 和 malloc 单次分配的内存块是连续的。无论是使用 new 运算符还是 malloc 函数，它们都会向操作系统请求一段连续的内存空间来存储数据。
+
+侵入式数据结构(`Intrusive Data Structures`)的优点
+* 通用性 可以将同一实体用于不同的数据结构 改一下HNode即可
+* 减少内存管理 不用为结点和数据分别分配内存(但是我感觉不嵌入 也可以啊)
+
+```c
+#define container_of(ptr, type, member) ({                  \
+    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+    (type *)( (char *)__mptr - offsetof(type, member) );})
+```
+这一块也很难理解 首先传参 ptr , member 是HNode* 类型 type是Entry类型
+((type *)0)->member 这一部分0强转为`type*`也就是`Entry*` 其实也就是NULL Entry
+反正就是通过成员变量的指针 获取整个结构体变量的地址
+
+({ statement1; statement2; ...; statementN; }) 这是语句表达式 值为statementN (最后一个语句)
+
+#### linux 文本搜索
+```shell
+# -E 表示展开所有宏 grep -C 5 表示显示匹配行额上下各5行
+g++ -E test_contain.cpp | grep -C 5 "(Entry*"
+# ack: A search tool like grep, optimized for developers.
+# 更多用法后续再探索把  awk和sed可以去了解 处理文本
+ack -C 5 "Entry" test_contain.cpp
+```
