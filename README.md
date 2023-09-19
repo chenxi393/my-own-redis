@@ -167,7 +167,7 @@ struct pollfd {
 去测试三种并发的连接数 或者类似于QPS的东西 可以网上找找有没有类似的
 
 
-### 07 08 09  9.17
+### 07 08 9.17
 * 07主要是get set del 操作的实现 自定义了协议 难度不大
 * 目前为止难度最大的就是06 event loop那里 事件循环的三种方式
 * 据了解go net listen就是（socket bind listen accept）的集合 且linux内置epoll 可以考虑用go写一个redis 然后
@@ -182,10 +182,13 @@ struct pollfd {
 
 * 当负载因子太高 需要扩容哈希表 但是扩容会耗费事件 可能redis不可用 需要保留两个哈希表 逐渐移动节点
 * 08节页太难了吧 很多都看不懂
-* 作业：We typically grow the hash table when the `load factor` hits 0.5 and `shrink` when we hit 0.125. 官方答案是如果继续运行 扩容可能是不必要的 网上有到0.125时缩容
 * 哈希码hcode的生成方式可以稍微注意一下 和一些加密方式md5啥的好像类似模式
+* Exercises: We typically grow the hash table when the `load factor` hits 0.5 and `shrink` when we hit 0.125. 官方答案是如果继续运行 扩容可能是不必要的 网上有到0.125时缩容
+    * >Besides, shrinking does not always return the memory to OS, this is dependent on many factors such as the malloc implementation and the level of memory fragmentation; the outcome of shrinking is not easily predictable.
+    * 建议周期性的缩容(例如20分钟 试探一次? 或者delete 多少多少次再缩容)
+    * 因为收缩的内存不一定返回给操作系统 这取决于malloc的实现和内存碎片化水平
 
-#### 侵入式数据结构  这个困扰了一会 但是理解了之后感觉还是很有用的 而且只有没有gc的语言可以实现 (这可以写在简历上)
+#### ⭐⭐侵入式数据结构  这个困扰了一会 但是理解了之后感觉还是很有用的 而且只有没有gc的语言可以实现 (这可以写在简历上)
 ```c
 // hashtable node, should be embedded into the payload
 struct HNode {
@@ -220,7 +223,7 @@ struct Entry {
 
 ({ statement1; statement2; ...; statementN; }) 这是语句表达式 值为statementN (最后一个语句)
 
-#### linux 文本搜索
+#### ⭐linux 文本搜索
 ```shell
 # -E 表示展开所有宏 grep -C 5 表示显示匹配行额上下各5行
 g++ -E test_contain.cpp | grep -C 5 "(Entry*"
@@ -228,3 +231,27 @@ g++ -E test_contain.cpp | grep -C 5 "(Entry*"
 # 更多用法后续再探索把  awk和sed可以去了解 处理文本
 ack -C 5 "Entry" test_contain.cpp
 ```
+
+#### valgrind 检查内存泄漏
+```shell
+# 可以用tldr看看用法 或者man
+valgrind --log-file=valReport --leak-check=full --show-reachable=yes --leak-resolution=low ./a.out
+valgrind --tool=massif --stacks=yes ./a.out
+massif-visualizer massif.out.15379
+```
+
+
+### GDB 以字符串形式打印uint8指针
+* `x/s` 内存中的数据解释为字符串并打印出来。以给定的地址开始，按照字符串的格式打印数据，直到遇到 null 终止符（'\0'）
+* `x/4s buf` 打印4个字节 分开打印
+* `x/4d buf` 以整数打印 没有d就是以 二进制（b） x（16进制） 
+* `x/16c buf`
+* p 命令（或 print 命令）：它是 GDB 中用于打印变量值的命令。p 命令将根据变量的类型解释内存中的数据，并打印出相应类型的值。它可以打印各种类型的变量，包括整数、浮点数、指针、结构体等。p 命令通常用于调试过程中观察和检查变量的值。
+* info args
+* info locals
+
+### 面试可以说
+* 实现了 poll epoll
+* 设计了协议09节
+* 实现了基本的get set del操作
+* 设计zset 分别用AVL 和skiplist（TODO） 实现

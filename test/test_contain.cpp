@@ -4,7 +4,7 @@
     const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
     (type *)( (char *)__mptr - offsetof(type, member) ); })
 
-//实测去掉typeof 那一行也是可以的 
+// 实测去掉typeof 那一行也是可以的
 
 struct HNode {
     HNode* next = NULL;
@@ -13,7 +13,7 @@ struct HNode {
 
 struct Entry {
     struct HNode node;
-    std::string key;
+    std::string key; // string 占32字节
     std::string val;
 };
 
@@ -26,8 +26,11 @@ int main()
     Entry* ee = container_of(tt, Entry, node);
     std::cout << ee->val << std::endl;
 
-    //下面这里直接计算也是可以的
-    Entry* direct = (Entry*) ((char*)tt-offsetof(Entry,node));
+    // std::cout<<sizeof(std::string)<<std::endl; //输出32
+    //  下面这里直接计算也是可以的
+    // std::cout<<offsetof(Entry,node)<<std::endl; //这里可以看出偏移量就是0 直接强转也不是不行
+    // std::cout<<((Entry*)tt)->val<<std::endl;
+    Entry* direct = (Entry*)((char*)tt - offsetof(Entry, node));
     std::cout << direct->val << std::endl;
     return 0;
 }

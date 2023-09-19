@@ -1,55 +1,92 @@
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-// 这个语法和代码规范感觉及其别扭（掺杂C和C++） UIUC的代码风格会好很多
-// 自己写的 还没写完 感觉面试可能让实现一个哈希表 所以自己试试
-struct Hnode {
-    Hnode* next = NULL;
-    size_t hcode = 0; // data 域
-};
+#include <iostream>
+using namespace std;
+// 模仿了本文哈希表（remove）的实现
+// 没有头结点 但非常高效的写法
+// valgrind测试过了 这种写法是没有内存泄漏的
+const int MAX_SIZE = 769;
+class MyHashMap {
+private:
+    struct Hnode {
+        Hnode* next;
+        int data;
+        int key;
+    };
+    Hnode* map[MAX_SIZE] = { nullptr };
 
-struct HashTable { // 不严格搞c++ 面向对象那一套 随便点
-    Hnode** tab = NULL;
-    size_t mask = 0; // 类似于要模的数 也是表最大数
-    size_t size = 0;
+public:
+    MyHashMap()
+    {
+    }
+    ~MyHashMap()
+    {
 
-    HashTable(size_t num) // 构造函数 很久很久没写cpp了
-    {
-        assert(num > 0 && num & (num - 1) == 0);
-        mask = num - 1;
-        size = 0; // 为什么上面初始化为1 了 还要
-        tab = (Hnode**)calloc(num, sizeof(Hnode*));
     }
-    void insert(Hnode* node) // 给的节点显然以及分配内存
+    void put(int key, int value)
     {
-        size_t pos = node->hcode & mask;
-        node->next = tab[pos];
-        tab[pos] = node;
-        ++size;
-    }
-    Hnode** find(size_t key) // 文章的意思是 返回的是指针的指针 便于删去这个指针
-    {
-        size_t pos = key & mask;
-        Hnode** head = &tab[pos]; // 这里就是操作原来分配的内存
-        while (*head) {
-            if ((*head)->hcode == key) {
-                return head;
+        int hash = key % MAX_SIZE;
+        Hnode* head = map[hash];
+        while (head) {
+            if (head->key == key) {
+                head->data = value;
+                return;
             }
-            head = &(*head)->next; // 这一块指针的指针操作 很绕很绕
-                                   // 有机会可以检查后续delete有没有内存泄漏 或者段错误
+            head = head->next;
+        }
+        Hnode* t = new Hnode;
+        t->data = value;
+        t->key = key;
+        t->next = map[hash];
+        map[hash] = t;
+    }
+
+    void remove(int key)
+    {
+        int hash = key % MAX_SIZE;
+        Hnode** head = &map[hash];
+        while (*head) {
+            if ((*head)->key == key) {
+                Hnode* temp = (*head); // *head 就是真正保存了new出来的那一块地址
+                *head = (*head)->next; // *head的值已经保存到temp 把head保存的地址变为下一个
+                delete temp; // 删除new出来的
+                return;
+            }
+            head = &(*head)->next; // 这里取的是（指针保存的结点实体）的next域的地址
         }
     }
 
-    Hnode* detach(Hnode** from)
+    int get(int key)
     {
-        Hnode* node = *from;
-        *from = (*from)->next;
-        size--;
-        return node;
+        int hash = key % MAX_SIZE;
+        Hnode* head = map[hash];
+        while (head) {
+            if (head->key == key) {
+                return head->data;
+            }
+            head = head->next;
+        }
+        return -1;
     }
 };
 
+/**
+ * Your MyHashMap object will be instantiated and called as such:
+ * MyHashMap* obj = new MyHashMap();
+ * obj->put(key,value);
+ * int param_2 = obj->get(key);
+ * obj->remove(key);
+ */
+
 int main()
 {
-    HashTable tab1(8);
+    MyHashMap myHashMap;
+    myHashMap.put(1, 1); // myHashMap 现在为 [[1,1]]
+    myHashMap.put(2, 2); // myHashMap 现在为 [[1,1], [2,2]]
+    cout << myHashMap.get(1) << endl; // 返回 1 ，myHashMap 现在为 [[1,1], [2,2]]
+    cout << myHashMap.get(3) << endl; // 返回 -1（未找到），myHashMap 现在为 [[1,1], [2,2]]
+    myHashMap.put(2, 1); // myHashMap 现在为 [[1,1], [2,1]]（更新已有的值）
+    cout << myHashMap.get(2) << endl; // 返回 1 ，myHashMap 现在为 [[1,1], [2,1]]
+    myHashMap.remove(2); // 删除键为 2 的数据，myHashMap 现在为 [[1,1]]
+    cout << myHashMap.get(2) << endl; // 返回 -1（未找到），myHashMap 现在为 [[1,1]]
+    myHashMap.remove(1);
+    myHashMap.remove(1);
 }
