@@ -313,5 +313,5 @@ massif-visualizer massif.out.15379
 * 实现了基本的get set del操作
 * 设计zset 分别用AVL 和skiplist（TODO） 实现
 * 侵入式数据结构
-* 使用valgrind优化程序
+* 使用valgrind优化程序 使用了makefile 构建C++程序 strace跟踪系统调用
 * 对比测试不同实现的优劣（TODO）
