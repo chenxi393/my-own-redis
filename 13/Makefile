@@ -6,7 +6,7 @@ CFLAGS = -Wall -Wextra -g #Wall 开启所有警告 Wextra 开启额外的警告
 TARGET = server
 
 # 源文件列表
-SRCS = 12_server.cpp hashtable.cpp zset.cpp avl.cpp
+SRCS = 13_server.cpp hashtable.cpp zset.cpp avl.cpp heap.cpp
 
 # 生成的目标文件列表
 OBJS = $(SRCS:.cpp=.o)
@@ -32,3 +32,6 @@ clean:
 
 run:
 	./server
+
+test: 
+	g++ -g test_heap.cpp -o test_heap && ./test_heap
