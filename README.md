@@ -245,7 +245,7 @@ struct Entry {
 
 侵入式数据结构(`Intrusive Data Structures`)的优点
 * 通用性 可以将同一实体用于不同的数据结构 改一下HNode即可
-* 减少内存管理 不用为结点和数据分别分配内存(但是我感觉不嵌入 也可以啊)
+* 减少内存管理 不用为结点和数据分别分配内存(但是我感觉不嵌入 也可以啊--其实11.zset.h 那里就体现了 因为有续集要使用多种数据结构)
 
 ```c
 #define container_of(ptr, type, member) ({                  \
@@ -265,9 +265,98 @@ struct Entry {
 * Exercises2：构建AVL更多的测试用例
 * 使用分析工具检查测试用例是否完全覆盖目标代码会很有帮助 和模糊测试
 * TODO:优点改造成跳表  并构造详细的测试
-* 记得做Exercises：实现zrank 命令 计算某个范围内的元素数量 请尝试添加更多命令
+* 记得做Exercises：实现zrank 命令 计算某个范围内的元素数量 请尝试添加更多命令 TODO TODO 9.24 先放着 实现跳表再一起实现
 * 做完再继续下一节
 
+### skiplist zset
+redis的跳表比原始论文描述的算法做了以下几点改动
+1. 允许重复分数
+2. 键相等时，继续比较结点数据
+3. 双向链表实现 （便于实现ZREVRANGE 或 ZREVRANGEBYSCORE 命令）
+
+面试常问：为什么选择用跳表而不是其他有序的数据结构（红黑树，AVL等）
+* 哈希表不是有序的 不适用范围查找（zset经常用于访问查找 排名场景经常用） 
+* 平衡树 范围查找需要找到最小值 再以中序遍历继续找（不好实现）
+* 而跳表只需要找到最小值 遍历最下一层即可，`易于范围查找`
+* 平衡树插入删除的逻辑复杂，而且别的操作 跳表`易于实现,调试,修改`
+* `内存占用少` p=1/4 时 跳表每个节点只包含1.33个指针 而平衡树每个节点需要2个指针
+
+基本结构
+* 表头：维护跳跃表各层的指针。（默认32层）
+* 中间节点：维护节点数据和各层的前进后退指针。
+* 层：保存指向该层下一个节点的指针和与下个节点的间隔（span）。为了提高查找效率，程序总是先从高层开始访问，然后随着范围的缩小慢慢降低层次。
+* 表尾：全部为NULL，表示跳跃表各层的末尾。
+
+具体实现细节见代码注释
+```cpp
+struct zskiplistNode {
+    std::string* obj;   // 这里改为string
+    double score;       //按分值从小到大来排序
+    // 后退指针，只有第0层有效   逆序操作会用到
+    zskiplistNode* backward;
+    // 各层的前进指针及与下一个节点的间隔
+    struct zskiplistLevel {
+        zskiplistNode* forward; 
+        unsigned int span; // 跨度实际上是用来计算排位的
+    } level[];
+    // 实际上 结点数量就是元素数量+1 有头结点
+    // 每个结点可能会有很多层
+    // 而头结点默认32层
+};
+
+struct zskiplist {
+    // 表头节点和表尾节点
+    zskiplistNode *header, *tail;
+    // 表中节点的数量
+    unsigned long length;
+    // 表中层数最大的节点的层数
+    int level;
+};
+```
+[这篇不错](http://zhangtielei.com/posts/blog-redis-skiplist.html)
+1. ⭐⭐文中说 新结点的层高level是概率生成的 为什么？？ 幂次定律又是什么
+    * 若原来的底层结点与上层为2：1的关系（保证logn 的查找时间），新插入结点会打破2:1 若维护2：1的关系，则需要将插入节点位置后面所有的节点重新调整，这个时间是O（n）的，删除同理
+    * 所以我们不能要求上层节点个数是下层的一半。
+    * 解决办法就是随机生成每个节点的level （⭐⭐这是为什么插入要优于AVL）
+    * 由以下伪码根据概率论公式可以计算一个节点平均的层数（期望）E = 1 / (1-p)
+    * 当p=1/4时，每个节点所包含的平均指针数目为1.33
+    * 有机会可以看原始论文的计算方式 上面文中计算的平均时间复杂度为O(log n)
+```python
+# 计算随机层数的伪码描述
+randomLevel()
+    level := 1
+    // random()返回一个[0...1)的随机数
+    while random() < p and level < MaxLevel do
+        level := level + 1
+    return level
+# 在redis 中 
+    p = 1/4
+    MaxLevel = 32
+```
+
+2. 前进指针 forward 用来遍历skiplist
+3. 跨度 span 实际上是用来计算排位的，无论哪一层查找，将沿途访问过的结点的跨度累计就是排位
+4. backward 后退指针只有第0层有效 只能一个个倒退
+5. 排序按照score(可以重复) 和obj（member）的字典序 一起排序
+6. zset排名是从0开始计算 从大到小 字典序在前
+
+实际上当数据量小的时候zset是由ziplist（TODO:需要去了解）实现的
+下面两个配置配置了何时换成skiplist
+```python
+zset-max-ziplist-entries 128
+zset-max-ziplist-value 64
+```
+
+### 12 事件循环和计时器
+1. IO操作和网络操作都需要超时设置
+    * 超时强踢 不能一直占着TCP连接不用
+2. 首先考虑TCP连接的超时，考虑使用链表，新的连接放到末尾即可
+3. 看了一下实现 也是使用侵入式数据结构
+4. 文章一堆static的意思是函数或者变量作用域仅限于当前文件
+5. 作业1 为IO操作添加超时操作 疑问 这里的IO操作不都是非阻塞的嘛 而且不是 内核告诉我们有数据了才会去read 和write 难道是处理一次之后的 因为一次请求后客户端会主动关闭连接
+6. 作业2 是用排序结构（堆）实现计时器 TODO TODO 这些先待办把 最后再来实现
+
+### 13 堆和TTL
 
 ### 突发奇想的疑问
 系统调用的底层实现原理
@@ -313,5 +402,5 @@ massif-visualizer massif.out.15379
 * 实现了基本的get set del操作
 * 设计zset 分别用AVL 和skiplist（TODO） 实现
 * 侵入式数据结构
-* 使用valgrind优化程序 使用了makefile 构建C++程序 strace跟踪系统调用
+* 使用valgrind优化程序 使用了makefile 构建C++程序 strace跟踪系统调用 python脚本测试程序
 * 对比测试不同实现的优劣（TODO）
