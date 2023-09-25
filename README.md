@@ -1,23 +1,3 @@
-### Contents
-Part 1. Getting Started
-1. Introduction 
-2. Introduction to Sockets
-    * syscalls including socket(), bind(), listen(), accept(), read(), write(), close()
-3. Hello Server/Client
-4. Protocol Parsing        --Text vs. Binary
-5. The Event Loop and Nonblocking IO
-6. The Event Loop Implementation
-7. Basic Server: get, set, del
-
-Part 2. Essential Topics
-8. Data Structure: Hashtables
-9. Data Serialization
-10. The AVL Tree: Implementation and Testing
-11. The AVL Tree and the Sorted Set
-12. The Event Loop and Timers
-13. The Heap Data Structure and the TTL
-14. The Thread Pool and Asynchronous Tasks
-
 ### 05 三种方式处理并发连接
 1. fork创建新进程
 2. 多线程
@@ -200,7 +180,6 @@ int epoll_wait(int epfd, struct epoll_event *events, int max events, int timeout
 * 07主要是get set del 操作的实现 自定义了协议 难度不大
 * 目前为止难度最大的就是06 event loop那里 事件循环的三种方式
 * 据了解go net/http的 listen就是（socket bind listen accept）的集合 且linux的go内置epoll 
-* TODO: 可以考虑用go写一个redis 然后对比c++测试
 
 #### 08 疑问
 为什么哈希表要用2的幂 而不用素数 ？？
@@ -259,16 +238,16 @@ struct Entry {
 ({ statement1; statement2; ...; statementN; }) 这是语句表达式 值为statementN (最后一个语句)
 
 
-### 10 11 AVL zset
+### 10 11 AVL zset  TODO
 * Exercises1: 这个AVL不是特别高效由于`some reductant pointer updates`
 * 考虑存搞得差而不是存高度 这个以后再说吧 AVL工业界用的不多 
 * Exercises2：构建AVL更多的测试用例
 * 使用分析工具检查测试用例是否完全覆盖目标代码会很有帮助 和模糊测试
 * TODO:优点改造成跳表  并构造详细的测试
-* 记得做Exercises：实现zrank 命令 计算某个范围内的元素数量 请尝试添加更多命令 TODO TODO 9.24 先放着 实现跳表再一起实现
+* 记得做Exercises：实现zrank（给键查找排名） 命令 计算某个范围内的元素数量 请尝试添加更多命令 TODO TODO 9.24 先放着 实现跳表再一起实现
 * 做完再继续下一节
 
-### skiplist zset
+### skiplist zset TODO
 redis的跳表比原始论文描述的算法做了以下几点改动
 1. 允许重复分数
 2. 键相等时，继续比较结点数据
@@ -347,16 +326,40 @@ zset-max-ziplist-entries 128
 zset-max-ziplist-value 64
 ```
 
-### 12 事件循环和计时器
+### 12 事件循环和计时器  TODO
 1. IO操作和网络操作都需要超时设置
     * 超时强踢 不能一直占着TCP连接不用
-2. 首先考虑TCP连接的超时，考虑使用链表，新的连接放到末尾即可
+2. 首先考虑TCP连接的超时，考虑使用链表，新的连接放到末尾即可 这个链表只能实现固定时间（给每一个连接的的闲时是固定的 要想不固定得用排序结构）
 3. 看了一下实现 也是使用侵入式数据结构
 4. 文章一堆static的意思是函数或者变量作用域仅限于当前文件
 5. 作业1 为IO操作添加超时操作 疑问 这里的IO操作不都是非阻塞的嘛 而且不是 内核告诉我们有数据了才会去read 和write 难道是处理一次之后的 因为一次请求后客户端会主动关闭连接
 6. 作业2 是用排序结构（堆）实现计时器 TODO TODO 这些先待办把 最后再来实现
 
-### 13 堆和TTL
+### 13 堆和TTL TODO
+1. 缓存需要设置TTL(time to live)
+2. 采用最小堆（即根最小） 
+3. 每次来新元素放到数组最后一个 然后逐级调整（值变动 大放子节点 小放父节点 递归/递推））
+4. 作业1： 堆的add操作 需要logn的时间  怎么优化（使用哈希表喽）
+    * 答案说使用n叉树 比如4叉树 但实现起来会不会复杂
+    * 定时器不必非常精确的存储 可以把差别不大的键放在一起 但是获取键的时候给出精确的查询时间 但其实还是log时间复杂度的 快一些些
+5. 作业2： Redis真实的操作 没有使用排序结构实现过期
+    * 实际上 redis键的过期是放在过期字典里的 删除方式为惰性删除 和定期删除  没有采用定时删除（也就是到了时间就删除）
+
+### 14 线程池和异步任务 TODO
+1. 存在的问题 sorted set 删除键 在集合很大的情况下 删除可能很慢（logn） 因为命令的执行是单线程的嘛 键销毁期间服务是不可用的
+2. 考虑使用多线程 另开一个线程运行析构函数（键销毁函数）--似乎redis本身就是这么实现的（具体可以看看源码 再去了解）
+3. 使用pthread API (之前操作系统刚好学过) `pthread_mutex_t` （互斥锁） `pthread_cond_t` （条件变量）
+4. consumer在队列空的时候休眠 不空时使用条件变量唤醒
+5. 由mutex 保护队列的访问 这很操作系统（非常经典的使用）
+6. 还有个问题就是 如果异步删除的时候 客户端访问删除的键怎么办(代码里好像没有保护 join肯定没有意义 那为什么不主线程呢)
+7. 作业1： 尝试用信号量（替换条件变量和互斥锁）来实现线程池 TODO
+    * 信号量操作系统实验2有（用作条件变量 用做锁） 但是有点久远快忘了
+8. 作业2： 
+    * Implement the mutex using the semaphore. (Trivial)
+    * Implement the semaphore using the condition variable. (Easy)
+    * Implement the condition variable using only mutexes. (Intermediate)
+    * Now that you know these primitives are somewhat equivalent, why should you prefer one to another?
+
 
 ### 突发奇想的疑问
 系统调用的底层实现原理
@@ -404,3 +407,6 @@ massif-visualizer massif.out.15379
 * 侵入式数据结构
 * 使用valgrind优化程序 使用了makefile 构建C++程序 strace跟踪系统调用 python脚本测试程序
 * 对比测试不同实现的优劣（TODO）
+* 这个项目非常好 主要是数据结构 计算机网络和操作系统也有涉及
+* 我觉得可以学以致用
+* TODO: 可以考虑用go写一个redis 然后对比c++测试
