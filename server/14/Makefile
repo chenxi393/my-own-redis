@@ -4,13 +4,13 @@ CFLAGS = -Wall -Wextra -g #Wall 开启所有警告 Wextra 开启额外的警告
 
 # 目标文件名
 TARGET = server
-TARGET1 = client
+
 # 源文件列表
-SRCS = 09_server.cpp hashtable.cpp
-SRCS1 = 09_client.cpp
+SRCS = 14_server.cpp hashtable.cpp zset.cpp avl.cpp heap.cpp thread_pool.cpp
+
 # 生成的目标文件列表
 OBJS = $(SRCS:.cpp=.o)
-OBJS1 = $(SRCS1:.cpp=.o)
+
 # 默认目标
 all: $(TARGET) $(TARGET1)
 
@@ -25,10 +25,13 @@ all: $(TARGET) $(TARGET1)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
-$(TARGET1): $(OBJS1)
-	$(CC) $(CFLAGS) $^ -o $@
 
 # 清理生成的文件
 clean:
 	rm -f $(OBJS) $(TARGET)
-	rm -f $(OBJS1) $(TARGET1)
+
+run:
+	./server
+
+test: 
+	g++ -g test_heap.cpp -o test_heap && ./test_heap
